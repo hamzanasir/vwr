@@ -6,11 +6,7 @@ Distributed under the GNU General Public License v2
 Copyright (C) 2015 NuMat Technologies
 """
 import socket
-import tornado.ioloop
-from tornado.ioloop import PeriodicCallback
-
-io_loop = tornado.ioloop.IOLoop.current()
-io_loop.start()
+from threading import Timer
 
 
 class CirculatingBath(object):
@@ -37,7 +33,7 @@ class CirculatingBath(object):
         self.maxDelay = 1200
         self.initialDelay = self.currentDelay = 5
         self._connect()
-        self.reconnect_loop = PeriodicCallback(self._reconnect, self.initialDelay) # noqa
+        self.reconnect_loop = Timer(self.initialDelay, self._reconnect)
 
     def _connect(self):
         """Connects to the device using two UDP raw sockets.
@@ -59,18 +55,18 @@ class CirculatingBath(object):
         if self.reconnect_trials < 10:
             try:
                 self._connect()
-                self.reconnect_loop.stop()
+                self.get_setpoint()
+                self.reconnect_loop = Timer(self.initialDelay, self._reconnect)
                 self.reconnect_trials = 0
             except:
+                Timer(self.currentDelay, self._reconnect).start()
                 self.reconnect_trials += 1
         else:
             if self.currentDelay < self.maxDelay:
                 self.currentDelay += 20
             else:
                 self.currentDelay = self.maxDelay
-            self.reconnect_loop.stop()
-            self.reconnect_loop = PeriodicCallback(self._reconnect, self.currentDelay) # noqa
-            self.reconnect_loop.start()
+            Timer(self.currentDelay, self._reconnect).start()
             self.reconnect_trials = 0
 
     def turn_on(self):
@@ -162,7 +158,6 @@ class CirculatingBath(object):
     def close(self):
         """Closes the listening port."""
         self.listener.close()
-        io_loop.stop()
 
     def _send(self, message):
         """Selds a message to the circulating bath."""
