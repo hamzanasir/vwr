@@ -15,9 +15,9 @@ class CirculatingBath(object):
 
     This class communicates with the circulating bath over UDP sockets.
     """
-    maxDelay = 60
-    initialDelay = 5
-    factor = 2.7182818284590451
+    max_delay = 60
+    initial_delay = 5
+    factor = 3
 
     def __init__(self, address, password=100, timeout=None):
         """Opens ports to communicate with the circulating bath.
@@ -33,8 +33,7 @@ class CirculatingBath(object):
         self.password = password
         self.timeout = timeout
         self.connected = False
-        self.reconnect_trials = 0
-        self.delay = self.initialDelay
+        self.delay = self.initial_delay
         self._connect()
 
     def _connect(self):
@@ -54,18 +53,12 @@ class CirculatingBath(object):
 
     def _reconnect(self):
         """Reconnects on decay to the bath"""
-        if self.reconnect_trials < 10:
-            try:
-                self._connect()
-                self.get_setpoint()
-                self.reconnect_trials = 0
-            except socket.timeout:
-                Timer(self.delay, self._reconnect).start()
-                self.reconnect_trials += 1
-        else:
-            self.delay = min(self.delay * self.factor, self.maxDelay) # noqa
+        try:
+            self._connect()
+            self.get_setpoint()
+        except socket.timeout:
+            self.delay = min(self.delay * self.factor, self.max_delay)
             Timer(self.delay, self._reconnect).start()
-            self.reconnect_trials = 0
 
     def turn_on(self):
         """Turns the circulating bath on.
@@ -167,7 +160,7 @@ class CirculatingBath(object):
         except socket.timeout:
             if self.connected:
                 self.connected = False
-                Timer(self.initialDelay, self._reconnect).start()
+                self._reconnect()
         self.waiting = True
 
     def _receive(self):
@@ -179,6 +172,6 @@ class CirculatingBath(object):
             response = None
             if self.connected:
                 self.connected = False
-                Timer(self.initialDelay, self._reconnect).start()
+                Timer(self.initial_delay, self._reconnect).start()
         self.waiting = False
         return response
