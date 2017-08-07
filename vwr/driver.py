@@ -15,6 +15,10 @@ class CirculatingBath(object):
 
     This class communicates with the circulating bath over UDP sockets.
     """
+    maxDelay = 60
+    initialDelay = 5
+    factor = 2.7182818284590451
+
     def __init__(self, address, password=100, timeout=None):
         """Opens ports to communicate with the circulating bath.
 
@@ -30,10 +34,8 @@ class CirculatingBath(object):
         self.timeout = timeout
         self.connected = False
         self.reconnect_trials = 0
-        self.maxDelay = 1200
-        self.initialDelay = self.currentDelay = 5
+        self.delay = self.initialDelay
         self._connect()
-        self.reconnect_loop = Timer(self.initialDelay, self._reconnect)
 
     def _connect(self):
         """Connects to the device using two UDP raw sockets.
@@ -56,17 +58,13 @@ class CirculatingBath(object):
             try:
                 self._connect()
                 self.get_setpoint()
-                self.reconnect_loop = Timer(self.initialDelay, self._reconnect)
                 self.reconnect_trials = 0
-            except:
-                Timer(self.currentDelay, self._reconnect).start()
+            except socket.timeout:
+                Timer(self.delay, self._reconnect).start()
                 self.reconnect_trials += 1
         else:
-            if self.currentDelay < self.maxDelay:
-                self.currentDelay += 20
-            else:
-                self.currentDelay = self.maxDelay
-            Timer(self.currentDelay, self._reconnect).start()
+            self.delay = min(self.delay * self.factor, self.maxDelay) # noqa
+            Timer(self.delay, self._reconnect).start()
             self.reconnect_trials = 0
 
     def turn_on(self):
@@ -166,10 +164,10 @@ class CirculatingBath(object):
         try:
             self.sender.sendto((message + '\r').encode('utf-8'),
                                (self.address, 1024))
-        except:
+        except socket.timeout:
             if self.connected:
                 self.connected = False
-                self.reconnect_loop.start()
+                Timer(self.initialDelay, self._reconnect).start()
         self.waiting = True
 
     def _receive(self):
@@ -181,6 +179,6 @@ class CirculatingBath(object):
             response = None
             if self.connected:
                 self.connected = False
-                self.reconnect_loop.start()
+                Timer(self.initialDelay, self._reconnect).start()
         self.waiting = False
         return response
