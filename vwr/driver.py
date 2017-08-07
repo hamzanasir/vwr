@@ -6,6 +6,11 @@ Distributed under the GNU General Public License v2
 Copyright (C) 2015 NuMat Technologies
 """
 import socket
+import tornado.ioloop
+from tornado.ioloop import PeriodicCallback
+
+io_loop = tornado.ioloop.IOLoop.current()
+io_loop.start()
 
 
 class CirculatingBath(object):
@@ -27,7 +32,12 @@ class CirculatingBath(object):
         self.address = address
         self.password = password
         self.timeout = timeout
+        self.connected = False
+        self.reconnect_trials = 0
+        self.maxDelay = 1200
+        self.initialDelay = self.currentDelay = 5
         self._connect()
+        self.reconnect_loop = PeriodicCallback(self._reconnect, self.initialDelay) # noqa
 
     def _connect(self):
         """Connects to the device using two UDP raw sockets.
@@ -42,6 +52,26 @@ class CirculatingBath(object):
         self.waiting = False
         if self.timeout:
             self.listener.settimeout(self.timeout)
+        self.connected = True
+
+    def _reconnect(self):
+        """Reconnects on decay to the bath"""
+        if self.reconnect_trials < 10:
+            try:
+                self._connect()
+                self.reconnect_loop.stop()
+                self.reconnect_trials = 0
+            except:
+                self.reconnect_trials += 1
+        else:
+            if self.currentDelay < self.maxDelay:
+                self.currentDelay += 20
+            else:
+                self.currentDelay = self.maxDelay
+            self.reconnect_loop.stop()
+            self.reconnect_loop = PeriodicCallback(self._reconnect, self.currentDelay) # noqa
+            self.reconnect_loop.start()
+            self.reconnect_trials = 0
 
     def turn_on(self):
         """Turns the circulating bath on.
@@ -132,13 +162,19 @@ class CirculatingBath(object):
     def close(self):
         """Closes the listening port."""
         self.listener.close()
+        io_loop.stop()
 
     def _send(self, message):
         """Selds a message to the circulating bath."""
         if self.waiting:
             raise IOError("Waiting for another bath request to be processed.")
-        self.sender.sendto((message + '\r').encode('utf-8'),
-                           (self.address, 1024))
+        try:
+            self.sender.sendto((message + '\r').encode('utf-8'),
+                               (self.address, 1024))
+        except:
+            if self.connected:
+                self.connected = False
+                self.reconnect_loop.start()
         self.waiting = True
 
     def _receive(self):
@@ -148,6 +184,8 @@ class CirculatingBath(object):
             response = message.decode('utf-8').strip()
         except socket.timeout:
             response = None
-            self._connect()
+            if self.connected:
+                self.connected = False
+                self.reconnect_loop.start()
         self.waiting = False
         return response
