@@ -159,7 +159,7 @@ class CirculatingBath(object):
     def _send(self, message):
         """Selds a message to the circulating bath."""
         if self.waiting:
-            raise IOError("Waiting for another bath request to be processed.")
+            Timer(5, self._send, [message]).start()
         try:
             self.sender.sendto((message + '\r').encode('utf-8'),
                                (self.address, 1024))
