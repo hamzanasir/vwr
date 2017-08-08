@@ -34,10 +34,7 @@ class CirculatingBath(object):
         self.timeout = timeout
         self.connected = False
         self.delay = self.initial_delay
-        try:
-            self._connect()
-        except socket.timeout:
-            Timer(self.delay, self._reconnect).start()
+        self._reconnect()
 
     def _connect(self):
         """Connects to the device using two UDP raw sockets.
