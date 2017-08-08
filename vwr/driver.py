@@ -16,8 +16,8 @@ class CirculatingBath(object):
     This class communicates with the circulating bath over UDP sockets.
     """
     max_delay = 60
-    initial_delay = 5
-    factor = 3
+    initial_delay = 1
+    factor = 2
 
     def __init__(self, address, password=100, timeout=None):
         """Opens ports to communicate with the circulating bath.
@@ -34,7 +34,10 @@ class CirculatingBath(object):
         self.timeout = timeout
         self.connected = False
         self.delay = self.initial_delay
-        self._connect()
+        try:
+            self._connect()
+        except socket.timeout:
+            Timer(self.delay, self._reconnect).start()
 
     def _connect(self):
         """Connects to the device using two UDP raw sockets.
@@ -49,13 +52,13 @@ class CirculatingBath(object):
         self.waiting = False
         if self.timeout:
             self.listener.settimeout(self.timeout)
+        self.get_setpoint()  # dummy request to check if bath is connected
         self.connected = True
 
     def _reconnect(self):
         """Reconnects on decay to the bath"""
         try:
             self._connect()
-            self.get_setpoint()
         except socket.timeout:
             self.delay = min(self.delay * self.factor, self.max_delay)
             Timer(self.delay, self._reconnect).start()
@@ -83,10 +86,14 @@ class CirculatingBath(object):
 
     def get(self):
         """Gets the setpoint and internal temperature."""
-        return {'setpoint': self.get_setpoint(),
-                'actual': self.get_internal_temperature(),
-                'pump': self.get_pump_speed(),
-                'on': self.get_operating_status()}
+        response = {'setpoint': self.get_setpoint(),
+                    'actual': self.get_internal_temperature(),
+                    'pump': self.get_pump_speed(),
+                    'on': self.get_operating_status()}
+        if self.connected:
+            return response
+        else:
+            return {'connected': False}
 
     def get_setpoint(self):
         """Gets the setpoint temperature."""
@@ -172,6 +179,7 @@ class CirculatingBath(object):
             response = None
             if self.connected:
                 self.connected = False
-                Timer(self.initial_delay, self._reconnect).start()
+                self._reconnect()
+                return None
         self.waiting = False
         return response
