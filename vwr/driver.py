@@ -54,6 +54,7 @@ class CirculatingBath(object):
             self.listener.settimeout(self.timeout)
         self.get_setpoint()  # dummy request to check if bath is connected
         self.connected = True
+        self.delay = self.initial_delay
 
     def _reconnect(self):
         """Reconnects on decay to the bath"""
