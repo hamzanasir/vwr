@@ -92,6 +92,7 @@ class CirculatingBath(object):
                     'pump': self.get_pump_speed(),
                     'on': self.get_operating_status()}
         if self.connected:
+            response.update({'connected': True})
             return response
         else:
             return {'connected': False}
