@@ -100,18 +100,13 @@ class CirculatingBath(object):
 
     def get(self):
         """Gets the setpoint and internal temperature."""
-        setpoint = self.get_setpoint()
-        actual = self.get_internal_temperature()
-        pump = self.get_pump_speed()
-        on = self.get_operating_status()
-
-        response = {'setpoint': setpoint if setpoint else False,
-                    'actual': actual if actual else False,
-                    'pump': pump if pump else False,
-                    'on': on if on else False,
+        response = {'setpoint': self.get_setpoint(),
+                    'actual': self.get_internal_temperature(),
+                    'pump': self.get_pump_speed(),
+                    'on': self.get_operating_status(),
                     'fault': self.check_fault(),
                     'connected': True}
-        if self.connected:
+        if self.connected and all(v is not None for v in response.values()):
             return response
         else:
             return {'connected': False}
