@@ -87,9 +87,9 @@ class CirculatingBath(object):
         response = {'setpoint': self.get_setpoint(),
                     'actual': self.get_internal_temperature(),
                     'pump': self.get_pump_speed(),
-                    'on': self.get_operating_status()}
+                    'on': self.get_operating_status(),
+                    'connected': True}
         if self.connected:
-            response.update({'connected': True})
             return response
         else:
             return {'connected': False}
@@ -159,15 +159,16 @@ class CirculatingBath(object):
     def _send(self, message):
         """Selds a message to the circulating bath."""
         if self.waiting:
-            Timer(5, self._send, [message]).start()
-        try:
-            self.sender.sendto((message + '\r').encode('utf-8'),
-                               (self.address, 1024))
-        except socket.timeout:
-            if self.connected:
-                self.connected = False
-                self._reconnect()
-        self.waiting = True
+            Timer(1, self._send, [message]).start()
+        else:
+            try:
+                self.sender.sendto((message + '\r').encode('utf-8'),
+                                   (self.address, 1024))
+            except socket.timeout:
+                if self.connected:
+                    self.connected = False
+                    self._reconnect()
+            self.waiting = True
 
     def _receive(self):
         """Receives messages from the circulating bath."""
