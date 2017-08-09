@@ -67,8 +67,11 @@ class CirculatingBath(object):
         Returns:
             True if successful, else False.
         """
+        self.listener.settimeout(5)
         self._send('SO1P{}'.format(self.password))
-        return (self._receive() == '!')
+        response = self._receive()
+        self.listener.settimeout(self.timeout)
+        return (response == '!')
 
     def turn_off(self):
         """Turns the circulating bath off.
@@ -79,8 +82,11 @@ class CirculatingBath(object):
         Returns:
             True if successful, else False.
         """
+        self.listener.settimeout(5)
         self._send('SO0P{}'.format(self.password))
-        return (self._receive() == '!')
+        response = self._receive()
+        self.listener.settimeout(self.timeout)
+        return (response == '!')
 
     def get(self):
         """Gets the setpoint and internal temperature."""
