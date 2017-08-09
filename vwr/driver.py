@@ -88,12 +88,28 @@ class CirculatingBath(object):
         self.listener.settimeout(self.timeout)
         return (response == '!')
 
+    def check_fault(self):
+        """Checks for faults with the bath
+
+        Returns:
+            True if faulty, else False
+        """
+        self._send('RF')
+        response = self._receive()
+        return (response == '1')
+
     def get(self):
         """Gets the setpoint and internal temperature."""
-        response = {'setpoint': self.get_setpoint(),
-                    'actual': self.get_internal_temperature(),
-                    'pump': self.get_pump_speed(),
-                    'on': self.get_operating_status(),
+        setpoint = self.get_setpoint()
+        actual = self.get_internal_temperature()
+        pump = self.get_pump_speed()
+        on = self.get_operating_status()
+
+        response = {'setpoint': setpoint if setpoint else False,
+                    'actual': actual if actual else False,
+                    'pump': pump if pump else False,
+                    'on': on if on else False,
+                    'fault': self.check_fault(),
                     'connected': True}
         if self.connected:
             return response
@@ -164,9 +180,10 @@ class CirculatingBath(object):
 
     def _send(self, message):
         """Selds a message to the circulating bath."""
-        if self.waiting:
+        if self.waiting or not self.connected:
             Timer(1, self._send, [message]).start()
         else:
+            self.waiting = True
             try:
                 self.sender.sendto((message + '\r').encode('utf-8'),
                                    (self.address, 1024))
@@ -174,7 +191,7 @@ class CirculatingBath(object):
                 if self.connected:
                     self.connected = False
                     self._reconnect()
-            self.waiting = True
+                self.waiting = False
 
     def _receive(self):
         """Receives messages from the circulating bath."""
